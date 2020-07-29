@@ -1,5 +1,4 @@
 import gql from 'graphql-tag'
-
 export let movieList = gql`
 query Movie {
     movies{

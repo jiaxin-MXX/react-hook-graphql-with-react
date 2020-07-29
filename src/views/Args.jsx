@@ -1,27 +1,27 @@
-import React, { Component } from 'react';
-import { Query } from "react-apollo";
+import React, { useState , useRef ,useEffect} from 'react';
+import { useLazyQuery } from '@apollo/client';
 import { hello } from '../graphql/queries/index'
-class Args extends Component {
-    constructor(props) {
-        super(props);
-        this.state = { 
 
-        };
+function Args(props) {
+    const inputRef = useRef()
+    let [ title , settitle ] = useState()
+    let [gettitle,{loading,data}] = useLazyQuery(hello)
+    
+    const send = () =>{
+        gettitle({ variables: { name: inputRef.current.value } })
     }
-    render() {
-        return (
-            <Query query={ hello } variables={{name:"贾鑫"}}>
-                {
-                    ({loading,data})=>{
-                        console.log(data)
-                        return (
-                            !loading && <p>{data.hello}</p>
-                        )
-                    }
-                }
-            </Query>
-        );
-    }
+    useEffect(()=>{
+        if(data && data.hello){
+            settitle(data.hello)
+        }
+    },[data])
+    if (loading) return <p>Loading ...</p>
+    return (
+        <>
+            <div>{title}</div>
+            <input ref={inputRef} /><button  onClick={send}>send title</button>
+        </>
+    )
 }
 
-export default Args;
+export default Args

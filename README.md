@@ -1,68 +1,162 @@
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## react结合Graphql
 
-## Available Scripts
+### 安装依赖
 
-In the project directory, you can run:
+```js
+yarn add @apollo/client graphql
+```
 
-### `yarn start`
+> 注意 使用@apollo/client之后，当前组件必定是一个函数式组件，否则会报错
 
-Runs the app in the development mode.<br />
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+### 创建实例
 
-The page will reload if you make edits.<br />
-You will also see any lint errors in the console.
+```js
+import { ApolloClient } from '@apollo/client';
 
-### `yarn test`
+const client = new ApolloClient({
+  uri: 'http://localhost:4000/graphql',
+})
+export default client
+```
 
-Launches the test runner in the interactive watch mode.<br />
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### 通过 ApolloProvider 到 React
 
-### `yarn build`
+```js
+import React from 'react';
+import ReactDOM from 'react-dom';
+import { ApolloProvider } from '@apollo/client';
+import App from './views/App.jsx';
 
-Builds the app for production to the `build` folder.<br />
-It correctly bundles React in production mode and optimizes the build for the best performance.
+import client from "./graphql/index.js";
+console.log(client)
+ReactDOM.render(
+  <ApolloProvider client={client}>
+      <App />
+   </ApolloProvider>,
+  document.getElementById('root')
+);
+```
 
-The build is minified and the filenames include the hashes.<br />
-Your app is ready to be deployed!
+### 使用
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- 查询：
 
-### `yarn eject`
+> 这里有两种，一种是带参数的，第二种属于不带参数的查询：
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+```js
+//不带参数的查询
+//query的index文件
+import gql from 'graphql-tag'
+export let movieList = gql`
+query Movie {
+    movies{
+      id
+      title
+      genres
+      rating
+    }
+}
+`
+//App.jsx文件
+import React , { Fragment }from 'react'
+import { useQuery } from '@apollo/client';
+import {movieList} from '../graphql/queries/index'
+function App() {
+const { loading, data, refetch } = useQuery(movieList);
+console.log(data)
+  return (
+    <>
+        <div>
+        {
+             !loading &&
+             data.movies.map(item => (
+                 <Fragment key={item.id}>
+                     <li>
+                         <br/>
+                         id:{item.id}<br/>
+                         title:{item.title}<br/>
+                         genres:{item.genres}<br/>
+                         rating:{item.rating}<br/>
+                     </li>
+                     <br/>
+                 </Fragment>
+             ))
+        }
+        </div>
+        <button onClick={()=>refetch()}>更新</button>
+    </>
+  )
+}
+export default App;
+```
+> 带参数并且和手动发送请求：
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```js
+//query的index文件
+import gql from 'graphql-tag'
+export let hello = gql`query ($name:String){
+    hello(name:$name)
+}`
+//Args.js文件
+import React, { useState , useRef ,useEffect} from 'react';
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+import { useLazyQuery } from '@apollo/client';
+import { hello } from '../graphql/queries/index'
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+function Args(props) {
+    const inputRef = useRef()
+    let [ title , settitle ] = useState()
 
-## Learn More
+    let [gettitle,{loading,data}] = useLazyQuery(hello)
+    
+    const send = () =>{
+        gettitle({ variables: { name: inputRef.current.value } })
+    }
+    useEffect(()=>{
+        if(data && data.hello){
+            settitle(data.hello)
+        }
+    },[data])
+    if (loading) return <p>Loading ...</p>
+    return (
+        <>
+            <div>{title}</div>
+            <input ref={inputRef} /><button  onClick={send}>send title</button>
+        </>
+    )
+}
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+export default Args
+// 这里我们输入input的值之后点击发送会自动出现  hello world xxx
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- 变更
 
-### Code Splitting
+> 变更操作主要是增删改的操作，相对应schema的mutation字段
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/code-splitting
-
-### Analyzing the Bundle Size
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size
-
-### Making a Progressive Web App
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app
-
-### Advanced Configuration
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/advanced-configuration
-
-### Deployment
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/deployment
-
-### `yarn build` fails to minify
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify
+```js
+//mutations下的index文件
+import { gql } from '@apollo/client';
+export const insert = gql`
+mutation insert($title:String!,$genres:String!,$rating:Float,$theater:Int){
+    insert(title:$title,genres:$genres,rating:$rating,theater:$theater){
+      title,
+      genres,
+      rating,
+      theater
+    }
+}`
+//Mutation.jsx
+import React from 'react'
+import { useMutation } from '@apollo/client';
+import { insert } from '../graphql/mutations/index'
+function Mutations(){
+    let [insertData, {data}] = useMutation(insert)
+    console.log(data)
+    return(
+        <button onClick={()=>insertData({ variables: {title:"英伦对决2",genres:"悬疑2",rating:8.8,theater:6} })}>add</button>
+    )
+}
+export default Mutations;
+//这里目前来说是没有什么要说的点。。还没有遇到高危操作
+```
